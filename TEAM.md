@@ -15,3 +15,5 @@
 2. Only edit your `personN/` folder (Person 1 may also edit root docs)
 3. Open a PR with title `[Person N] ...`
 4. Merge in order: person1 → person2,3 → person4 → person5 → person6
+
+**AI assistants:** everyone (and their AI) should read [AI_INSTRUCTIONS.md](AI_INSTRUCTIONS.md) before coding.

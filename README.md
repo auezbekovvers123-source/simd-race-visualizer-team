@@ -22,6 +22,8 @@ python main.py
 
 See [TEAM.md](TEAM.md) for GitHub usernames and merge order.
 
+**Using ChatGPT, Copilot, or another AI?** Read [AI_INSTRUCTIONS.md](AI_INSTRUCTIONS.md) — copy the section for your person number into the AI chat.
+
 ## License
 
 MIT — teaching and demos.

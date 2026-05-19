@@ -3,7 +3,7 @@
 | Person | GitHub | Folder | Responsibility |
 |--------|--------|--------|----------------|
 | Person 1 | @auezbekovvers123-source | person1/ | Repo setup, config, app shell, main.py |
-| Person 2 | TBD | person2/ | Race animation model |
+| Person 2 | @Kukili00007 | person2/ | Race animation model |
 | Person 3 | TBD | person3/ | Benchmark engine |
 | Person 4 | TBD | person4/ | Race canvas / graphics |
 | Person 5 | TBD | person5/ | Controls & race loop |

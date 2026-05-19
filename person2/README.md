@@ -1,5 +1,7 @@
 # Person 2 — Race animation model
 
+**Owner:** @Kukili00007
+
 **Files:** `race_model.py`
 
 - `RaceAnimation` — frame progress for scalar vs SIMD lanes

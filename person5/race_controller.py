@@ -198,25 +198,27 @@ class RaceController:
             self._after_id = self._root.after(self.REFRESH_MS, self._tick)
 
     def _draw_countdown_overlay(self, word: str) -> None:
-        self._hud.track_canvas.delete("all")
-        c = self._hud.grid_canvas
+        self._hud.grid_canvas.delete("all")
+        c = self._hud.track_canvas
         c.delete("all")
-        cw = max(520, c.winfo_width())
-        ch = max(280, c.winfo_height())
-        c.create_rectangle(0, 0, cw, ch, fill="#0b1220", outline="")
+        cw = max(400, c.winfo_width())
+        ch = max(160, c.winfo_height())
+        c.create_rectangle(0, 0, cw, ch, fill="#0b1220", outline="", tags=("countdown",))
         c.create_text(
             cw / 2,
-            ch / 2 - 10,
+            ch / 2 - 12,
             text=word,
             fill=THEME["accent"],
-            font=("Segoe UI", 56, "bold"),
+            font=("Segoe UI", 64, "bold"),
+            tags=("countdown",),
         )
         c.create_text(
             cw / 2,
-            ch / 2 + 50,
+            ch / 2 + 48,
             text="Same N — SIMD takes wider steps.",
             fill=THEME["muted"],
-            font=("Segoe UI", 11),
+            font=("Segoe UI", 12),
+            tags=("countdown",),
         )
 
     def _tick(self) -> None:

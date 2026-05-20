@@ -9,11 +9,13 @@ from __future__ import annotations
 from tkinter import Canvas
 
 from person1.config import THEME
-from person2.race_model import RaceFrameState
+from person2.race_model import RaceFrameState, ceil_div
 
 
 class RaceCanvasDrawer:
     """Draw scalar/SIMD grids and a dual-lane race track on a Tkinter Canvas."""
+
+    DISPLAY_COLS = 20
 
     def __init__(self, cell_size: int = 18, grid_cols: int = 16) -> None:
         self.cell_size = max(8, int(cell_size))
@@ -40,215 +42,195 @@ class RaceCanvasDrawer:
 
     def draw_grids(self, canvas: Canvas, state: RaceFrameState, n: int, width: int) -> None:
         """
-        Draw scalar and SIMD activity grids.
-
-        Scalar: one highlighted cell.
-        SIMD: one highlighted chunk column across `width` parallel rows.
+        Draw windowed scalar + SIMD element grids (fits on screen for large N).
         """
-        canvas.delete("grids")
+        canvas.delete("all")
         w = max(1, int(width))
         n = max(1, int(n))
+        cw = max(520, int(canvas.winfo_width() or 520))
 
-        x0 = self.pad
-        y0 = self.pad
-        scalar_rows = max(1, (n + self.grid_cols - 1) // self.grid_cols)
+        cols = min(self.DISPLAY_COLS, max(4, n))
+        cell_w = min(24, (cw - 80) // max(cols, 1))
+        gap = 3
+
+        def window_start(done: int) -> int:
+            half = cols // 2
+            return max(0, min(n - cols, done - half))
+
+        def title(y: int, text: str, color: str) -> None:
+            canvas.create_text(12, y, text=text, fill=color, anchor="w", font=("Segoe UI", 9, "bold"), tags=("grids",))
+
+        y_scalar = 10
+        title(y_scalar, "Scalar (one index at a time)", THEME["scalar"])
+        base_y = y_scalar + 16
         scalar_active = max(0, min(n - 1, state.scalar_elems - 1))
-        self._draw_scalar_grid(canvas, x0, y0, n, scalar_rows, scalar_active)
+        s_start = window_start(scalar_active)
 
-        grid_w = self.grid_cols * self.cell_size
-        gap = self.pad * 2
-        simd_y0 = y0
-        simd_x0 = x0 + grid_w + gap
-        simd_cols = max(1, (n + w - 1) // w)
-        simd_active_col = max(0, min(simd_cols - 1, (max(0, state.simd_elems - 1)) // w))
-        self._draw_simd_grid(canvas, simd_x0, simd_y0, simd_cols, w, simd_active_col)
-
-    def draw_track(self, canvas: Canvas, scalar_frac: float, simd_frac: float, width: int) -> None:
-        """Draw a two-lane racetrack and place scalar/SIMD cars by progress fractions."""
-        canvas.delete("track")
-        scalar_frac = self._clamp01(scalar_frac)
-        simd_frac = self._clamp01(simd_frac)
-
-        cw = max(300, int(canvas.winfo_width()))
-        ch = max(220, int(canvas.winfo_height()))
-        x0 = self.pad
-        x1 = cw - self.pad
-        top = ch - 90
-        lane_h = 26
-        lane_gap = 12
-
-        canvas.create_text(
-            x0,
-            top - 18,
-            anchor="w",
-            text=f"Race Track (SIMD x{max(1, int(width))})",
-            fill=THEME["text"],
-            tags=("track",),
-        )
-
-        self._draw_lane(canvas, x0, top, x1, lane_h, "Scalar", THEME["scalar"])
-        self._draw_lane(
-            canvas,
-            x0,
-            top + lane_h + lane_gap,
-            x1,
-            lane_h,
-            "SIMD",
-            THEME["simd"],
-        )
-
-        self._draw_car(canvas, x0, x1, top, lane_h, scalar_frac, THEME["scalar"], "S")
-        self._draw_car(
-            canvas,
-            x0,
-            x1,
-            top + lane_h + lane_gap,
-            lane_h,
-            simd_frac,
-            THEME["simd"],
-            "V",
-        )
-
-    def _draw_scalar_grid(
-        self,
-        canvas: Canvas,
-        x0: int,
-        y0: int,
-        n: int,
-        rows: int,
-        active_idx: int,
-    ) -> None:
-        canvas.create_text(
-            x0,
-            y0 - 8,
-            anchor="sw",
-            text="Scalar",
-            fill=THEME["text"],
-            tags=("grids",),
-        )
-        for idx in range(n):
-            row = idx // self.grid_cols
-            col = idx % self.grid_cols
-            if row >= rows:
-                break
-            x1 = x0 + col * self.cell_size
-            y1 = y0 + row * self.cell_size
-            fill = THEME["accent"] if idx == active_idx else THEME["panel"]
-            outline = THEME["scalar"] if idx == active_idx else THEME["muted"]
+        for j in range(cols):
+            idx = s_start + j
+            x0 = 24 + j * (cell_w + gap)
+            active = idx == scalar_active and state.scalar_elems > 0
+            fill = THEME["accent"] if active else THEME["panel"]
+            outline = THEME["scalar"] if active else THEME["muted"]
+            ow = 3 if active else 1
             canvas.create_rectangle(
-                x1,
-                y1,
-                x1 + self.cell_size - 2,
-                y1 + self.cell_size - 2,
+                x0,
+                base_y,
+                x0 + cell_w,
+                base_y + cell_w,
                 fill=fill,
                 outline=outline,
-                width=1,
+                width=ow,
+                tags=("grids",),
+            )
+            canvas.create_text(
+                x0 + cell_w / 2,
+                base_y + cell_w / 2,
+                text=str(idx),
+                fill="#0b1220" if active else THEME["text"],
+                font=("Consolas", 8, "bold" if active else "normal"),
                 tags=("grids",),
             )
 
-    def _draw_simd_grid(
-        self,
-        canvas: Canvas,
-        x0: int,
-        y0: int,
-        cols: int,
-        width: int,
-        active_col: int,
-    ) -> None:
-        canvas.create_text(
-            x0,
-            y0 - 8,
-            anchor="sw",
-            text=f"SIMD ({width}-wide)",
-            fill=THEME["text"],
-            tags=("grids",),
-        )
-        for r in range(width):
-            for c in range(cols):
-                x1 = x0 + c * self.cell_size
-                y1 = y0 + r * self.cell_size
-                is_active = c == active_col
-                fill = THEME["accent"] if is_active else THEME["panel"]
-                outline = THEME["simd"] if is_active else THEME["muted"]
+        y_simd = base_y + cell_w + 14
+        title(y_simd, f"SIMD ({w}-wide parallel lanes)", THEME["simd"])
+        grid_top = y_simd + 16
+        simd_chunk = ceil_div(max(state.simd_elems, 1), w) - 1 if state.simd_elems > 0 else 0
+        base_index = simd_chunk * w
+        s2 = window_start(base_index)
+
+        for r in range(w):
+            row_y = grid_top + r * (cell_w + gap)
+            for j in range(cols):
+                idx = s2 + j
+                x0 = 24 + j * (cell_w + gap)
+                in_chunk = base_index <= idx < min(n, base_index + w)
+                active = in_chunk and state.simd_elems > 0
+                fill = THEME["simd"] if active else THEME["panel"]
+                outline = "#b8ffd0" if active else THEME["muted"]
+                ow = 3 if active else 1
                 canvas.create_rectangle(
-                    x1,
-                    y1,
-                    x1 + self.cell_size - 2,
-                    y1 + self.cell_size - 2,
+                    x0,
+                    row_y,
+                    x0 + cell_w,
+                    row_y + cell_w,
                     fill=fill,
                     outline=outline,
-                    width=1,
+                    width=ow,
+                    tags=("grids",),
+                )
+                canvas.create_text(
+                    x0 + cell_w / 2,
+                    row_y + cell_w / 2,
+                    text=str(idx),
+                    fill="#061018" if active else THEME["muted"],
+                    font=("Consolas", 7, "bold" if active else "normal"),
                     tags=("grids",),
                 )
 
-    def _draw_lane(
-        self,
-        canvas: Canvas,
-        x0: int,
-        y0: int,
-        x1: int,
-        lane_h: int,
-        label: str,
-        color: str,
-    ) -> None:
-        canvas.create_rectangle(
-            x0,
-            y0,
-            x1,
-            y0 + lane_h,
-            fill=THEME["panel"],
-            outline=THEME["muted"],
-            width=1,
-            tags=("track",),
-        )
-        canvas.create_line(
-            x1 - 16,
-            y0,
-            x1 - 16,
-            y0 + lane_h,
-            fill=THEME["accent"],
-            width=2,
-            tags=("track",),
-        )
         canvas.create_text(
-            x0 + 6,
-            y0 + lane_h / 2,
-            anchor="w",
-            text=label,
-            fill=color,
+            cw - 8,
+            grid_top + w * (cell_w + gap) + 4,
+            text=f"Window: {cols} of N={n:,}",
+            fill=THEME["muted"],
+            anchor="ne",
+            font=("Segoe UI", 8),
+            tags=("grids",),
+        )
+
+    def draw_track(self, canvas: Canvas, scalar_frac: float, simd_frac: float, width: int) -> None:
+        """Draw a two-lane racetrack with moving cars (fits the visible canvas height)."""
+        canvas.delete("all")
+        scalar_frac = self._clamp01(scalar_frac)
+        simd_frac = self._clamp01(simd_frac)
+
+        cw = max(400, int(canvas.winfo_width() or 400))
+        ch = max(120, int(canvas.winfo_height() or 120))
+
+        margin_l, margin_r = 32, 32
+        lane_h = min(44, max(30, (ch - 52) // 3))
+        gap = 10
+        lane_top = 28
+        lane_w = cw - margin_l - margin_r
+        finish_x = margin_l + lane_w - 6
+        car_w, car_h = 44, 22
+        max_x = max(10, lane_w - car_w - 12)
+
+        pct_s = int(scalar_frac * 100)
+        pct_v = int(simd_frac * 100)
+        canvas.create_text(
+            cw / 2,
+            10,
+            text=f"RACE  ·  width {max(1, int(width))}  ·  scalar {pct_s}%  ·  SIMD {pct_v}%",
+            fill=THEME["text"],
+            font=("Segoe UI", 10, "bold"),
             tags=("track",),
         )
 
-    def _draw_car(
-        self,
+        for y0, label, col in (
+            (lane_top, "Scalar lane", THEME["scalar"]),
+            (lane_top + lane_h + gap, "SIMD lane", THEME["simd"]),
+        ):
+            y1 = y0 + lane_h
+            canvas.create_rectangle(
+                margin_l,
+                y0,
+                margin_l + lane_w,
+                y1,
+                fill=THEME.get("track_lane", "#0f1724"),
+                outline="#2f3d5a",
+                width=2,
+                tags=("track",),
+            )
+            for dash in range(0, lane_w, 26):
+                canvas.create_line(
+                    margin_l + dash,
+                    (y0 + y1) / 2,
+                    margin_l + dash + 14,
+                    (y0 + y1) / 2,
+                    fill="#2a3550",
+                    width=2,
+                    tags=("track",),
+                )
+            canvas.create_text(
+                margin_l,
+                y0 - 12,
+                anchor="w",
+                text=label,
+                fill=col,
+                font=("Segoe UI", 9, "bold"),
+                tags=("track",),
+            )
+
+        canvas.create_line(
+            finish_x,
+            lane_top - 4,
+            finish_x,
+            lane_top + 2 * lane_h + gap + 4,
+            fill="#f0f0f0",
+            width=4,
+            tags=("track",),
+        )
+
+        sx = margin_l + 8 + max_x * scalar_frac
+        vx = margin_l + 8 + max_x * simd_frac
+        self._draw_car_body(
+            canvas, sx, lane_top + lane_h / 2, car_w, car_h, THEME.get("scalar_hot", THEME["scalar"])
+        )
+        self._draw_car_body(canvas, vx, lane_top + lane_h + gap + lane_h / 2, car_w, car_h, THEME["simd"])
+
+    @staticmethod
+    def _draw_car_body(
         canvas: Canvas,
-        x0: int,
-        x1: int,
-        y0: int,
-        lane_h: int,
-        frac: float,
+        x: float,
+        y_mid: float,
+        body_w: int,
+        body_h: int,
         color: str,
-        text: str,
     ) -> None:
-        left = x0 + 38
-        right = x1 - 24
-        xpos = left + (right - left) * frac
-        half_w = 11
-        half_h = lane_h / 2 - 3
-        canvas.create_rectangle(
-            xpos - half_w,
-            y0 + lane_h / 2 - half_h,
-            xpos + half_w,
-            y0 + lane_h / 2 + half_h,
-            fill=color,
-            outline=THEME["bg"],
-            width=1,
-            tags=("track",),
-        )
-        canvas.create_text(
-            xpos,
-            y0 + lane_h / 2,
-            text=text,
-            fill=THEME["bg"],
-            tags=("track",),
-        )
+        x0, y0 = x, y_mid - body_h / 2
+        x1, y1 = x + body_w, y_mid + body_h / 2
+        canvas.create_rectangle(x0, y0, x1, y1, fill=color, outline="#0b1220", width=2, tags=("track",))
+        wr, wy = 5, y1 - 2
+        canvas.create_oval(x0 + 4 - wr, wy - wr, x0 + 4 + wr, wy + wr, fill="#111", outline="#333", tags=("track",))
+        canvas.create_oval(x1 - 4 - wr, wy - wr, x1 - 4 + wr, wy + wr, fill="#111", outline="#333", tags=("track",))

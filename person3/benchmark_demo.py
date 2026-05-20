@@ -7,7 +7,11 @@ vectorized function that represents SIMD-style processing.
 
 import numpy as np
 
-from person3.benchmark import compare_functions
+try:
+    from person3.benchmark import compare_functions
+except ModuleNotFoundError:
+    # This fallback helps when running: python3 person3/benchmark_demo.py
+    from benchmark import compare_functions
 
 
 def scalar_square_sum(data):

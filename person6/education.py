@@ -70,6 +70,61 @@ def pseudocode_simd(op: OperationKey, width: int) -> str:
     ).replace("WIDTH", w)
 
 
+def why_scalar_slower_text(width: int, op: OperationKey | None = None) -> str:
+    """
+    Plain-language explanation for the Learn tab: why scalar loses to SIMD.
+    """
+    w = max(1, int(width))
+    op_name = OP_KEY_TO_LABEL.get(op, "your operation") if op else "your operation"
+    isa = "SSE-style (4 numbers at once)" if w == 4 else "AVX-style (8 numbers at once)"
+    chunks = "N ÷ 4" if w == 4 else "N ÷ 8"
+
+    return (
+        "Why is scalar slower than SIMD?\n"
+        "================================\n\n"
+        "Think of two workers packing boxes on a conveyor belt.\n\n"
+        "  • SCALAR worker: picks up ONE box, processes it, puts it down, "
+        "then walks back and repeats for the next box.\n"
+        f"  • SIMD worker: picks up {w} boxes at the same time, does the same step "
+        f"on all {w}, then moves to the next group.\n\n"
+        "Same total work (N items), but the SIMD worker needs far fewer trips.\n\n"
+        "What you see in this app\n"
+        "------------------------\n"
+        "  • Top grids: scalar highlights one index at a time; SIMD lights a whole "
+        f"{w}-wide chunk each step.\n"
+        "  • Racetrack: both start together, but SIMD's car reaches the finish in "
+        f"fewer ticks (about {chunks} as many steps for large N).\n"
+        "  • Results tab: after the race we time a real Python loop (scalar) vs "
+        "NumPy vector code (SIMD-like) for the same array size.\n\n"
+        "Three simple reasons scalar is slower\n"
+        "-----------------------------------\n"
+        "1) More loop trips\n"
+        f"   Scalar runs about N steps. SIMD runs about N/{w} steps "
+        f"(each step handles {w} elements).\n\n"
+        "2) Extra work per element\n"
+        "   A Python for-loop does index math, bounds checks, and dispatch "
+        "every single time. SIMD-style code does one bulk operation on many "
+        "values (less overhead per item).\n\n"
+        "3) The CPU has special wide units\n"
+        f"   Modern CPUs have vector units built for {isa}. "
+        "Scalar code often uses the regular ALU one value at a time; "
+        "vectorized code can feed those wide units so the hardware works "
+        "as designed.\n\n"
+        f"Your current settings: {op_name}, SIMD width = {w}\n\n"
+        "Important honesty note\n"
+        "----------------------\n"
+        f"You will not always get exactly {w}× speedup. Memory speed, cache, "
+        "and how data is laid out in RAM also matter. This demo uses simple "
+        f"loops and NumPy so the difference is easy to see in class — not "
+        f"every real program is a perfect {w}× win.\n\n"
+        "One sentence for your defense\n"
+        "-----------------------------\n"
+        f"Scalar is slower because it completes the job in ~N serial steps, "
+        f"while SIMD completes the same job in ~N/{w} wider steps using "
+        "hardware that processes multiple data values per instruction."
+    )
+
+
 def full_education_panel(op: OperationKey, width: int) -> str:
     """Combined panel text for the education Text widget."""
     isa = "SSE (128-bit class)" if width == 4 else "AVX (256-bit class)"

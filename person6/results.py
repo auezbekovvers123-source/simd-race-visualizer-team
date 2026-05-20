@@ -56,6 +56,14 @@ class ResultsPanel:
     def has_measurements(self) -> bool:
         return self._measured_scalar is not None and self._measured_vector is not None
 
+    @property
+    def measured_scalar(self) -> Optional[float]:
+        return self._measured_scalar
+
+    @property
+    def measured_vector(self) -> Optional[float]:
+        return self._measured_vector
+
     def clear_measurements(self) -> None:
         self._measured_scalar = None
         self._measured_vector = None

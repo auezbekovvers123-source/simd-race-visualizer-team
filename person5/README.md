@@ -1,5 +1,7 @@
 # Person 5 — Controls & race loop
 
+**Owner:** @zhanassylzhakyp-debug
+
 **Files:** `race_controller.py`
 
 - `RaceController` — countdown (3…2…1…GO), continuous tick loop, step mode
